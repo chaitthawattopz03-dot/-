@@ -1,0 +1,1317 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>เช็คชื่อส่งกะ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#faf8f5; --surface:#ffffff; --text:#231e18; --muted:#8d8378;
+    --divider:#e9e3da; --accent:#c2540e; --accent-100:#fbe6d6; --accent-700:#a8460b; --accent-800:#7c3308;
+    --good:#2f7d5c; --good-100:#e1f3ea;
+    --shadow-sm:0 1px 3px rgba(30,22,10,.08); --shadow-md:0 10px 28px rgba(30,22,10,.12);
+    --radius:14px; --font:'Prompt',sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--font)}
+  h3,h4{font-family:var(--font);margin:0}
+  button,input{font-family:var(--font)}
+  .muted{color:var(--muted)}
+  .small{font-size:13px} .xsmall{font-size:12px} .center{text-align:center} .pad{padding:20px 0}
+  .mono{letter-spacing:.08em}
+  .accent{color:var(--accent-700)!important}
+  .accent-text{color:var(--accent-700)}
+  .row-between{display:flex;align-items:center;justify-content:space-between;width:100%}
+  .row-center{display:flex;align-items:center}
+  .gap-2{gap:8px}
+  .hr{border:none;border-top:1px solid var(--divider);width:100%;margin:4px 0}
+
+  #app{min-height:100vh;display:flex;flex-direction:column}
+  .topbar{position:sticky;top:0;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--bg);border-bottom:1px solid var(--divider)}
+  .brand{display:flex;align-items:center;gap:8px;font-weight:800;font-size:16px;letter-spacing:-.01em}
+  .topbar-right{display:flex;align-items:center;gap:8px}
+  .tag{display:inline-block;padding:3px 11px;border-radius:999px;font-size:12px;font-weight:600}
+  .tag-neutral{background:var(--good-100);color:var(--good)}
+  .tag-accent{background:var(--accent-100);color:var(--accent-700)}
+
+  .main{flex:1;padding:24px 16px 100px;max-width:720px;width:100%;margin:0 auto}
+  .panel{display:flex;flex-direction:column;gap:20px;animation:pop .22s ease-out}
+  .panel.narrow{max-width:420px;margin:0 auto}
+  @keyframes pop{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:scale(1)}}
+
+  .card{background:var(--surface);border:1px solid var(--divider);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow-sm)}
+  .card.elev-md{box-shadow:var(--shadow-md)}
+  .card-title{font-weight:700;font-size:15px}
+  .card-body{font-size:13px;color:var(--muted);margin-top:2px}
+  .kicker{font-size:12px;color:var(--muted);font-weight:600;letter-spacing:.03em}
+
+  .qr-card{display:flex;flex-direction:column;align-items:center;gap:14px;padding:28px 20px}
+  .ring-wrap{position:relative;width:250px;height:250px}
+  .ring-svg{position:absolute;inset:0;transform:rotate(-90deg);width:100%;height:100%}
+  .ring-bg{fill:none;stroke:var(--divider);stroke-width:7}
+  .ring-fg{fill:none;stroke:var(--accent-700);stroke-width:7;stroke-linecap:round;transition:stroke-dashoffset 1s linear}
+  .qrbox{position:absolute;inset:16px;display:flex;align-items:center;justify-content:center;background:var(--surface);border-radius:10px;transition:opacity .2s,filter .2s}
+  .qrbox.expired{opacity:.35;filter:grayscale(1)}
+  .qrbox.pulse{animation:pulse 1.1s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+  .countdown-label{font-family:var(--font);font-weight:800;font-size:36px;color:var(--accent-700);font-variant-numeric:tabular-nums}
+  .countdown-mini{font-family:var(--font);font-weight:800;font-size:18px;color:var(--accent-700);font-variant-numeric:tabular-nums}
+  .notice-success{width:100%;display:flex;align-items:center;gap:8px;background:var(--accent-100);color:var(--accent-800);border-radius:8px;padding:8px 12px;font-size:13px}
+
+  .btn{border-radius:9px;padding:11px 16px;font-size:14px;font-weight:600;cursor:pointer;border:1px solid transparent;transition:opacity .15s}
+  .btn:hover{opacity:.85}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .btn-block{width:100%}
+  .btn-primary{background:var(--accent-700);color:#fff}
+  .btn-secondary{background:var(--surface);border-color:var(--divider);color:var(--text)}
+  .btn-ghost{background:transparent;border-color:transparent;color:var(--text)}
+
+  .checkin-head{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+  .progress-track{width:100%;height:6px;background:var(--divider);border-radius:99px;overflow:hidden;margin-top:2px}
+  .progress-fill{height:100%;background:var(--accent-700);transition:width 1s linear}
+
+  .namelist{display:flex;flex-direction:column;gap:6px}
+  .rowcard{border:1px solid var(--divider);border-radius:10px;padding:12px;display:flex;align-items:center;gap:12px;background:var(--surface)}
+  label.rowcard{cursor:pointer;min-height:48px}
+  .rowcard-active{border-color:var(--accent-700);background:var(--accent-100)}
+  .rowcard-disabled{opacity:.45;cursor:default}
+  .rowcard input[type=radio]{width:18px;height:18px;flex-shrink:0}
+  .rowcard span{font-size:16px}
+  .rowlist{display:flex;flex-direction:column;gap:6px}
+  .rowcard.static{cursor:default}
+  .rowcard-info{min-width:0}
+  .rowcard-name{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .avatar{width:36px;height:36px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#fff;flex-shrink:0}
+  .save-btn{position:sticky;bottom:90px;box-shadow:var(--shadow-md)}
+
+  .statgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  .stat{display:flex;flex-direction:column;align-items:flex-start;gap:6px}
+  .stat-icon{color:var(--accent-700)}
+  .stat-num{font-family:var(--font);font-weight:800;font-size:26px}
+
+  .barchart{display:flex;align-items:flex-end;gap:12px;height:130px;border-bottom:2px solid var(--divider);padding-bottom:2px}
+  .bar-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;height:100%;justify-content:flex-end}
+  .bar-count{font-size:11px;font-weight:600;color:var(--muted)}
+  .bar-fill{width:100%;min-height:3px;border-radius:5px 5px 0 0;background:linear-gradient(180deg,var(--accent-700),var(--accent))}
+  .bar-label{font-size:11px;color:var(--muted)}
+
+  .master-card{display:flex;flex-direction:column;align-items:flex-start;gap:12px;padding:20px;max-width:560px;margin:0 auto}
+  .addrow{display:flex;gap:8px;width:100%}
+  .input{border:1px solid var(--divider);border-radius:9px;padding:10px 12px;font-size:14px;background:var(--surface);color:var(--text);width:100%}
+  .input:focus{outline:2px solid var(--accent-700);outline-offset:1px}
+
+  .pin-card{display:flex;flex-direction:column;align-items:center;gap:14px;padding:32px 24px;max-width:320px;margin:40px auto}
+  .pin-icon{width:56px;height:56px;border-radius:999px;background:var(--accent-100);color:var(--accent-700);display:flex;align-items:center;justify-content:center}
+  .pin-input{width:100%;text-align:center;font-size:26px;letter-spacing:.5em;padding:12px;font-family:var(--font);font-weight:700}
+  .pin-input.shake{animation:shake .35s}
+  @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+  .pin-error{color:var(--accent-700);font-size:13px}
+
+  .verify-wrap{width:100%;border:1px solid var(--divider);border-radius:8px;overflow:hidden;margin-top:8px}
+  .verify-row{display:grid;align-items:stretch}
+  .verify-head-row{background:var(--surface)}
+  .verify-name-cell{font-size:10px;padding:3px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:var(--surface);border-right:1px solid var(--divider);border-top:1px solid var(--divider);display:flex;align-items:center}
+  .verify-head-label{font-weight:700;font-size:10px;border-top:none}
+  .verify-head{font-size:8px;color:var(--muted);display:flex;align-items:center;justify-content:center;writing-mode:vertical-rl;padding:2px 0;border-right:1px solid var(--divider);min-width:0}
+  .verify-cell{min-height:15px;border-right:1px solid var(--divider);border-top:1px solid var(--divider);background:var(--surface);min-width:0}
+  .verify-cell.weekly{background:var(--accent-100)}
+  .verify-cell.annual{background:#dbe7f7}
+  .verify-cell.sick{background:#fbdada}
+  .verify-cell.sudden{background:#e8dbf7}
+
+  .bottomnav{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--bg);border-top:1px solid var(--divider);box-shadow:0 -6px 20px rgba(30,22,10,.08);z-index:20;padding-bottom:env(safe-area-inset-bottom)}
+  .tabbtn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:10px 4px 6px;background:none;border:none;cursor:pointer;font-size:11px;color:var(--text);opacity:.55}
+  .tabbtn.active{color:var(--accent-700);opacity:1;font-weight:700}
+  .tabbtn svg{display:block}
+
+  @media (max-width:380px){ .statgrid{gap:8px} .stat-num{font-size:22px} }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------- shared backend (Cloud Firestore) ----------
+     Paste your Firebase project config below to make records/workers/
+     schedule sync live across every device (QR display, phones, admin's
+     history page). Until this is filled in, the app keeps working exactly
+     as before using per-device localStorage only. */
+  var FIREBASE_CONFIG = {
+    apiKey: "AIzaSyBO7EsZrQFdxBSyz_gyzP2tLJTNfhtmq3A",
+    authDomain: "handoff-d5898.firebaseapp.com",
+    projectId: "handoff-d5898",
+    storageBucket: "handoff-d5898.firebasestorage.app",
+    messagingSenderId: "16004769988",
+    appId: "1:16004769988:web:d9dc4517c4983d74cd4191"
+  };
+
+  var firebaseEnabled = false;
+  var fbDB = null;
+  try {
+    if (FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.apiKey.indexOf('YOUR_') !== 0 && typeof firebase !== 'undefined'){
+      firebase.initializeApp(FIREBASE_CONFIG);
+      fbDB = firebase.firestore();
+      firebaseEnabled = true;
+    }
+  } catch(e){ firebaseEnabled = false; }
+
+
+  /* ---------- config ---------- */
+  var CONFIG = {
+    expiryMinutes: 15,  // how long one QR code stays valid for check-in (handover meeting runs ~15 min)
+    graceMinutes: 15    // how many minutes after shift start still counts as "on time"
+  };
+
+  var HISTORY_KEY = 'qrShiftRecords_v3';
+  var WORKERS_KEY = 'qrShiftWorkers_v1';
+  var RING_R = 119, RING_CIRC = 2 * Math.PI * RING_R;
+
+  var DEFAULT_WORKERS = ['สมพร พรมมา','ประสาน ลาภเหลือ','สมยา เต็งศิริ','กฤษดา พรมคร','รัตนะ เส็งดี','สมเกียรติ จงกลาง','ฐานลินต์ วินิจธนษรณ์','สมศักดิ์ วงษ์ประทัด','วันพิชิต สุจริตปฏิภาณ','ณชานนท์ คำหวาน','บัณฑิต เดชขุนทด','ภควัต สิงหล','ขวัญชัย พวงวงษา','พิสิฏฐ์ สุวรรณสิทธิ์','ชูเกียรติ สีแก้ว','ชินกร เต็งศิริ','วัชราภรณ์ ดิลกโกมล','ดลพักร เสาหงษ์','ปรัชญา รวยระรื่น','กรีทาพล มีทาทอง','กฤษดา เสมาทอง','ธวัชชัย แป้นจันทร์','ณฐกรณ์ จันทาบุตร','ธรรมนูญ บุตรเลียบ','ประติวัติ ศรีรักษา','สมศักดิ์ หวังกุลกลาง','ศุภชัย แสงกาวิน','ฉัตรชัย อดิสรณกุล','สหรัฐ ชื่นสว่าง','สฤษดิ์ ภู่ห้อย','เธียรธรรม ประทุมวงศ์','สุเมธ พยับเดช','ฐนพัฒน์ บุญเถื่อน','ปัภัสสิริย์ พรหมมินทร์','จักรพันธ์ ภู่ขาว','นพณัฐ มณีรัตน์','ศิวกร ทิพย์สิงห์'];
+
+  var SHIFTS = [
+    { id: 'morning', label: 'กะเช้า', startH: 8, startM: 0, endH: 16, endM: 0 },
+    { id: 'afternoon', label: 'กะบ่าย', startH: 16, startM: 0, endH: 0, endM: 0 },
+    { id: 'night', label: 'กะดึก', startH: 0, startM: 0, endH: 8, endM: 0 }
+  ];
+
+  var AVATAR_COLORS = ['#8a6a5b','#5b7f8a','#8a7a5b','#6a5b8a','#5b8a6f','#8a5b6a'];
+
+  var ICON_QR = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1.4" stroke="currentColor" stroke-width="1.8"/><rect x="14" y="3" width="7" height="7" rx="1.4" stroke="currentColor" stroke-width="1.8"/><rect x="3" y="14" width="7" height="7" rx="1.4" stroke="currentColor" stroke-width="1.8"/><path d="M14 14h7M14 21h7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+  var ICON_CHECK = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M8 12.3l2.5 2.5L16 9.3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  var ICON_CHART = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 20V10M12 20V4M20 20v-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+  var ICON_PEOPLE = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M16 11a4 4 0 10-8 0 4 4 0 008 0zM4 20a8 8 0 0116 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+  var ICON_LOGO = '<svg width="26" height="26" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="9" height="9" rx="2" stroke="#a8460b" stroke-width="1.8"/><rect x="13" y="2" width="9" height="9" rx="2" stroke="#a8460b" stroke-width="1.8"/><rect x="2" y="13" width="9" height="9" rx="2" stroke="#a8460b" stroke-width="1.8"/><path d="M17 17h5M17 20h5M13 13.5v7" stroke="#a8460b" stroke-width="1.8" stroke-linecap="round"/></svg>';
+  var ICON_CLOCK = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/><path d="M12 7v5l3.2 2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+  var ICON_CHECK2 = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  var ICON_WARN = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 3l9 16H3l9-16z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 10v3.5M12 16.5v.01" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+  var ICON_LOCK = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none"><rect x="4" y="10" width="16" height="10" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M8 10V7a4 4 0 018 0v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+
+  var ADMIN_PIN = '3179';
+  var PIN_SESSION_KEY = 'qrShiftAdminUnlocked_v1';
+  var DEVICE_CHECKIN_KEY = 'qrShiftDeviceCheckin_v1';
+
+  /* one shared token for everyone in the meeting */
+  var state = {
+    tab: 'display', token: '', tokenCreatedAt: 0, expired: false, selectedName: '', deepLinkMode: false, justSaved: null, deviceLock: null,
+    records: [], now: Date.now(), workers: DEFAULT_WORKERS.slice(), editingIndex: -1, searchWorker: '', selectedRecordIds: {}, historySearchName: '',
+    unlockedAdmin: false, pendingTab: '', pinError: false,
+    schedule: {}, schedYear: new Date().getFullYear(), schedMonth: new Date().getMonth(), verifyMonth: '',
+    stackYear: new Date().getFullYear(), stackMonth: new Date().getMonth()
+  };
+
+  var qrInstance = null;
+
+  /* ---------- helpers ---------- */
+  function getCurrentShift(date){
+    var mins = date.getHours()*60 + date.getMinutes();
+    function inRange(s){
+      var start = s.startH*60+s.startM, end = s.endH*60+s.endM;
+      if (start < end) return mins >= start && mins < end;
+      return mins >= start || mins < end;
+    }
+    for (var i=0;i<SHIFTS.length;i++) if (inRange(SHIFTS[i])) return SHIFTS[i];
+    return SHIFTS[0];
+  }
+
+  function shiftStartDate(shift, refDate){
+    var d = new Date(refDate);
+    d.setHours(shift.startH, shift.startM, 0, 0);
+    if (shift.startH*60+shift.startM > refDate.getHours()*60+refDate.getMinutes()) d.setDate(d.getDate()-1);
+    return d;
+  }
+
+  function statusFor(record){
+    var shift = null;
+    for (var i=0;i<SHIFTS.length;i++) if (SHIFTS[i].id===record.shiftId) shift = SHIFTS[i];
+    shift = shift || SHIFTS[0];
+    var start = shiftStartDate(shift, new Date(record.timestamp));
+    var diffMin = (record.timestamp - start.getTime())/60000;
+    return diffMin <= CONFIG.graceMinutes ? 'ตรงเวลา' : 'สาย';
+  }
+
+  function windowKeyFor(shiftId, timestamp){
+    var s = null;
+    for (var i=0;i<SHIFTS.length;i++) if (SHIFTS[i].id===shiftId) s = SHIFTS[i];
+    s = s || SHIFTS[0];
+    return shiftStartDate(s, new Date(timestamp)).getTime() + '_' + shiftId;
+  }
+
+  function formatTime(ms){ return new Date(ms).toLocaleTimeString('th-TH', { hour:'2-digit', minute:'2-digit' }); }
+  function formatDate(ms){ return new Date(ms).toLocaleDateString('th-TH', { day:'2-digit', month:'2-digit' }); }
+  function localDateStr(ms){ var d = new Date(ms); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+  function fmtNow(){ return new Date(state.now).toLocaleString('th-TH', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }); }
+  function colorFor(name){ var h=0; for (var i=0;i<name.length;i++) h=(h*31+name.charCodeAt(i))>>>0; return AVATAR_COLORS[h % AVATAR_COLORS.length]; }
+  function escapeHtml(s){ return String(s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function randToken(){ return Math.random().toString(36).slice(2,10).toUpperCase(); }
+
+  function usedNamesForWindow(windowKey){
+    var set = new Set();
+    state.records.forEach(function(r){ if (windowKeyFor(r.shiftId, r.timestamp)===windowKey) set.add(r.name); });
+    return set;
+  }
+
+  var MAX_CHECKINS_PER_DAY = 2;
+  function countForDay(name, y, m, d){
+    var count = 0;
+    state.records.forEach(function(r){
+      if (r.name !== name) return;
+      var rd = new Date(r.timestamp);
+      if (rd.getFullYear()===y && rd.getMonth()===m && rd.getDate()===d) count++;
+    });
+    return count;
+  }
+
+  function computeCountdown(){
+    var totalMs = CONFIG.expiryMinutes*60000;
+    var remaining = Math.max(0, totalMs - (state.now - state.tokenCreatedAt));
+    var mm = Math.floor(remaining/60000), ss = Math.floor((remaining%60000)/1000);
+    var label = state.expired ? '00:00' : (String(mm).padStart(2,'0') + ':' + String(ss).padStart(2,'0'));
+    var frac = state.expired ? 0 : remaining/totalMs;
+    var urgent = !state.expired && remaining < 60000;
+    return { label: label, frac: frac, urgent: urgent, offset: (RING_CIRC*(1-frac)).toFixed(1) };
+  }
+
+  /* ---------- persistence ---------- */
+  function persistRecords(){
+    try { localStorage.setItem(HISTORY_KEY, JSON.stringify(state.records)); } catch(e){}
+  }
+  function fbToMillis(v){ return (v && typeof v.toMillis === 'function') ? v.toMillis() : v; }
+  function persistWorkers(){
+    if (firebaseEnabled){ try { fbDB.collection('appdata').doc('workers').set({ list: state.workers }); } catch(e){} return; }
+    try { localStorage.setItem(WORKERS_KEY, JSON.stringify(state.workers)); } catch(e){}
+  }
+
+  /* ---------- actions ---------- */
+  function genToken(){
+    state.token = randToken(); state.tokenCreatedAt = Date.now(); state.expired = false; state.selectedName = ''; state.now = Date.now();
+    renderFull();
+  }
+  function setTab(tab){ state.tab = tab; renderFull(); }
+  function resetQR(){ genToken(); }
+
+  function saveEntry(){
+    if (state.expired || !state.selectedName) return;
+    var now = Date.now();
+    var nowD = new Date(now);
+    if (countForDay(state.selectedName, nowD.getFullYear(), nowD.getMonth(), nowD.getDate()) >= MAX_CHECKINS_PER_DAY) return;
+    var shift = getCurrentShift(nowD);
+    var record = { id:'r_'+now, timestamp: now, clientTimestamp: now, dateStr: localDateStr(now), shiftId: shift.id, shiftLabel: shift.label, name: state.selectedName };
+    if (firebaseEnabled){
+      try {
+        var toWrite = Object.assign({}, record, { timestamp: firebase.firestore.FieldValue.serverTimestamp() });
+        fbDB.collection('records').doc(record.id).set(toWrite);
+      } catch(e){}
+      // local listener will pick this up and update state.records; no need to push locally here
+    } else {
+      state.records = state.records.concat([record]);
+      persistRecords();
+    }
+    state.justSaved = { name: state.selectedName, time: now };
+    state.deviceLock = { name: state.selectedName, time: now, date: localDateStr(now) };
+    try { localStorage.setItem(DEVICE_CHECKIN_KEY, JSON.stringify(state.deviceLock)); } catch(e){}
+    state.selectedName = '';
+    renderFull();
+    try { setTimeout(function(){ window.close(); }, 1200); } catch(e){}
+  }
+
+  function clearHistory(){
+    if (!confirm('ล้างประวัติทั้งหมด (สำหรับทดสอบ)?')) return;
+    if (firebaseEnabled){
+      fbDB.collection('records').get().then(function(snap){
+        var docs = snap.docs, i = 0, BATCH = 450;
+        function next(){
+          if (i >= docs.length) return;
+          var batch = fbDB.batch();
+          docs.slice(i, i+BATCH).forEach(function(d){ batch.delete(d.ref); });
+          batch.commit().then(function(){ i += BATCH; next(); });
+        }
+        next();
+      }).catch(function(e){});
+    } else {
+      state.records = [];
+      persistRecords();
+    }
+    state.selectedRecordIds = {};
+    renderFull();
+  }
+
+  function toggleRecordSelect(id){
+    if (state.selectedRecordIds[id]) delete state.selectedRecordIds[id];
+    else state.selectedRecordIds[id] = true;
+    renderFull();
+  }
+
+  function deleteSelectedRecords(){
+    var ids = Object.keys(state.selectedRecordIds);
+    if (!ids.length) return;
+    if (!confirm('ลบ ' + ids.length + ' รายการที่เลือก?')) return;
+    if (firebaseEnabled){
+      try {
+        var batch = fbDB.batch();
+        ids.forEach(function(id){ batch.delete(fbDB.collection('records').doc(id)); });
+        batch.commit();
+      } catch(e){}
+    } else {
+      state.records = state.records.filter(function(r){ return !state.selectedRecordIds[r.id]; });
+      persistRecords();
+    }
+    state.selectedRecordIds = {};
+    renderFull();
+  }
+
+  function exportCSV(){
+    var records = state.records || [];
+    var rows = [['วันที่','เวลา','กะ','ชื่อ','สถานะ']];
+    records.slice().sort(function(a,b){return a.timestamp-b.timestamp;}).forEach(function(r){
+      rows.push([formatDate(r.timestamp), formatTime(r.timestamp), r.shiftLabel, r.name, statusFor(r)]);
+    });
+    var csv = '\uFEFF' + rows.map(function(r){ return r.map(function(c){ return '"' + String(c).replace(/"/g,'""') + '"'; }).join(','); }).join('\n');
+    var blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a'); a.href = url; a.download = 'shift-checkin-history.csv';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+  }
+
+  function exportBackupJSON(){
+    var payload = { exportedAt: new Date().toISOString(), workers: state.workers, schedule: state.schedule, records: state.records };
+    var json = JSON.stringify(payload, null, 2);
+    var blob = new Blob([json], { type: 'application/json;charset=utf-8;' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a'); a.href = url; a.download = 'shift-checkin-backup-' + localDateStr(Date.now()) + '.json';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+  }
+
+  function addWorker(){
+    var input = document.getElementById('newWorkerInput'); if (!input) return;
+    var name = (input.value || '').trim(); if (!name) return;
+    if (state.workers.indexOf(name) !== -1) { alert('มีชื่อนี้อยู่แล้ว'); return; }
+    state.workers = state.workers.concat([name]);
+    persistWorkers(); renderFull();
+  }
+  function startEdit(i){
+    state.editingIndex = i; renderFull();
+    setTimeout(function(){ var el = document.getElementById('edit-input-'+i); if (el){ el.focus(); el.select(); } }, 0);
+  }
+  function saveEdit(i){
+    var el = document.getElementById('edit-input-'+i); if (!el) return;
+    var name = (el.value || '').trim(); if (!name) return;
+    var workers = state.workers.slice(); workers[i] = name; state.workers = workers;
+    persistWorkers(); state.editingIndex = -1; renderFull();
+  }
+  function deleteWorker(i){
+    if (!confirm('ลบชื่อนี้ออกจากรายชื่อพนักงาน?')) return;
+    state.workers = state.workers.filter(function(_, idx){ return idx !== i; });
+    persistWorkers(); state.editingIndex = -1; renderFull();
+  }
+
+  /* ---------- QR rendering ---------- */
+  function renderQR(){
+    var el = document.getElementById('qrbox');
+    if (!el || typeof QRCode === 'undefined' || !state.token) return;
+    el.innerHTML = '';
+    try {
+      var baseUrl = window.location.origin + window.location.pathname;
+      var text = baseUrl + '?token=' + encodeURIComponent(state.token) + '&created=' + state.tokenCreatedAt;
+      qrInstance = new QRCode(el, { text: text, width: 200, height: 200, colorDark: '#201e1d', colorLight: '#faf8f5', correctLevel: QRCode.CorrectLevel.M });
+    } catch(e) { /* QR render failed; rest of the page still works */ }
+  }
+
+  /* ---------- templates ---------- */
+  function topbarHtml(){
+    var shift = getCurrentShift(new Date(state.now));
+    return '<div class="topbar">' +
+      '<div class="brand">' + ICON_LOGO + '<span>เช็คชื่อส่งกะ</span></div>' +
+      '<div class="topbar-right"><span id="shiftTag" class="tag tag-neutral">' + escapeHtml(shift.label) + '</span><span id="nowLabel" class="muted small">' + fmtNow() + '</span></div>' +
+    '</div>';
+  }
+
+  function bottomNavHtml(){
+    if (state.deepLinkMode) return ''; // reached by scanning a QR — no navigation away from check-in
+    var tabs = [
+      { id:'display', label:'จอแสดง QR', icon: ICON_QR },
+      { id:'history', label:'ประวัติ & กราฟ', icon: ICON_CHART },
+      { id:'master', label:'รายชื่อพนักงาน', icon: ICON_PEOPLE }
+    ];
+    return '<nav class="bottomnav">' + tabs.map(function(t){
+      return '<button class="tabbtn ' + (state.tab===t.id?'active':'') + '" data-action="go-tab" data-tab="' + t.id + '">' + t.icon + '<span>' + t.label + '</span></button>';
+    }).join('') + '</nav>';
+  }
+
+  function displayTabHtml(){
+    var shift = getCurrentShift(new Date(state.now));
+    var windowKey = windowKeyFor(shift.id, state.now);
+    var checkedCount = usedNamesForWindow(windowKey).size;
+    var cd = computeCountdown();
+    return '<div class="panel narrow">' +
+      '<div class="card elev-md qr-card">' +
+        '<div style="text-align:center">' +
+          '<div class="card-kicker kicker">QR เช็คชื่อส่งกะ — ใช้ร่วมกันทั้งทีม</div>' +
+          '<div style="font-family:var(--font);font-weight:800;font-size:20px;margin-top:2px">' + escapeHtml(shift.label) + '</div>' +
+        '</div>' +
+        '<div class="ring-wrap">' +
+          '<svg viewBox="0 0 250 250" class="ring-svg"><circle cx="125" cy="125" r="119" class="ring-bg"/><circle id="ringProgress" cx="125" cy="125" r="119" class="ring-fg" stroke-dasharray="' + RING_CIRC.toFixed(1) + '" stroke-dashoffset="' + cd.offset + '"/></svg>' +
+          '<div id="qrbox" class="qrbox ' + (cd.urgent?'pulse':'') + ' ' + (state.expired?'expired':'') + '"></div>' +
+        '</div>' +
+        '<div id="countdownLabel" class="countdown-label">' + cd.label + '</div>' +
+        '<div class="muted small mono">รหัส ' + escapeHtml(state.token) + '</div>' +
+        '<div class="muted small center">ทุกคนสแกน QR นี้ร่วมกัน แล้วเลือกชื่อของตัวเองในหน้าถัดไปเพื่อบันทึกการเข้าร่วมส่งกะ</div>' +
+        '<div class="notice-success">' + ICON_CHECK2 + '&nbsp;เช็คชื่อแล้ว ' + checkedCount + ' / ' + state.workers.length + ' คน</div>' +
+        '<button class="btn btn-secondary btn-block" data-action="reset-qr">รีเซ็ต QR code</button>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function checkinTabHtml(){
+    if (state.justSaved){
+      return '<div class="panel narrow">' +
+        '<div class="card elev-md" style="align-items:center;text-align:center;gap:14px;padding:40px 24px">' +
+          '<div class="pin-icon" style="background:var(--good-100);color:var(--good)">' + ICON_CHECK2 + '</div>' +
+          '<div>' +
+            '<div class="card-title" style="font-size:18px">บันทึกเข้ากะแล้ว</div>' +
+            '<div class="muted small" style="margin-top:4px">' + escapeHtml(state.justSaved.name) + ' · ' + formatTime(state.justSaved.time) + '</div>' +
+          '</div>' +
+          '<div class="muted xsmall">ปิดหน้านี้ได้เลย ขอบคุณครับ</div>' +
+        '</div>' +
+      '</div>';
+    }
+    var cd = computeCountdown();
+    var shift = getCurrentShift(new Date(state.now));
+    var windowKey = windowKeyFor(shift.id, state.now);
+    var usedNames = usedNamesForWindow(windowKey);
+    var checkedCount = usedNames.size;
+    var body;
+
+    if (state.expired){
+      body = '<div class="card"><div class="row-center gap-2">' + ICON_WARN + '<div class="card-title accent">QR code หมดอายุแล้ว</div></div>' +
+        '<div class="card-body">รหัสนี้เปลี่ยนหรือหมดเวลาแล้ว ถือว่ายังไม่ได้ประชุมส่งกะ กรุณาแจ้งหัวหน้ากะให้แสดง QR code ใหม่ แล้วสแกนอีกครั้ง</div></div>';
+    } else {
+      var todayD = new Date(state.now);
+      var onDutyCount = 0;
+      var todayStr = localDateStr(state.now);
+      var deviceLockedToday = state.deviceLock && state.deviceLock.date === todayStr ? state.deviceLock.name : null;
+      var rows = state.workers.map(function(w){
+        var leaveType = leaveTypeFor(w, todayD.getFullYear(), todayD.getMonth(), todayD.getDate());
+        var checkedIn = usedNames.has(w);
+        var dayCount = countForDay(w, todayD.getFullYear(), todayD.getMonth(), todayD.getDate());
+        var reachedCap = dayCount >= MAX_CHECKINS_PER_DAY;
+        var deviceBlocked = deviceLockedToday && deviceLockedToday !== w;
+        var disabled = checkedIn || !!leaveType || reachedCap || deviceBlocked;
+        if (!leaveType) onDutyCount++;
+        var checked = state.selectedName === w;
+        var badge = '';
+        if (checkedIn) badge = '<span class="muted xsmall" style="margin-left:auto">' + ICON_CHECK2 + '</span>';
+        else if (leaveType) badge = '<span class="tag tag-accent" style="margin-left:auto">' + (LEAVE_LABELS[leaveType] || leaveType) + '</span>';
+        else if (reachedCap) badge = '<span class="tag tag-accent" style="margin-left:auto">ครบ ' + MAX_CHECKINS_PER_DAY + ' ครั้ง/วันแล้ว</span>';
+        else if (deviceBlocked) badge = '<span class="tag tag-accent" style="margin-left:auto">เครื่องนี้เช็คให้คนอื่นแล้ว</span>';
+        return '<label class="rowcard ' + (checked?'rowcard-active':'') + ' ' + (disabled?'rowcard-disabled':'') + '" data-action="' + (disabled?'':'select-name') + '" data-name="' + escapeHtml(w) + '">' +
+          '<input type="radio" name="worker-pick" ' + (checked?'checked':'') + ' ' + (disabled?'disabled':'') + '>' +
+          '<span>' + escapeHtml(w) + '</span>' + badge +
+        '</label>';
+      }).join('');
+      var deviceNoteHtml = deviceLockedToday ? '<div class="muted xsmall" style="margin-bottom:4px">มือถือเครื่องนี้เช็คชื่อให้ ' + escapeHtml(deviceLockedToday) + ' ไปแล้ววันนี้ — เลือกได้เฉพาะชื่อนี้เท่านั้น (สูงสุด ' + MAX_CHECKINS_PER_DAY + ' ครั้ง/วัน)</div>' : '';
+      body = deviceNoteHtml + '<div class="muted small">เช็คชื่อแล้ว ' + checkedCount + ' / ' + onDutyCount + ' คน (คนที่หยุด/ลาจะขึ้นทึบเลือกไม่ได้) — เลือกชื่อของคุณแล้วกดบันทึก</div>' +
+        '<div class="namelist">' + rows + '</div>' +
+        '<button class="btn btn-primary btn-block save-btn" data-action="save-entry" ' + (!state.selectedName?'disabled':'') + '>บันทึกเข้ากะ</button>';
+    }
+
+    return '<div class="panel narrow">' +
+      '<div class="card checkin-head">' +
+        '<div class="row-between"><h3>เช็คชื่อส่งกะ</h3><span id="countdownLabel" class="countdown-mini">' + cd.label + '</span></div>' +
+        '<div class="muted small">' + escapeHtml(shift.label) + ' · สแกนแล้วต้องบันทึกก่อนหมดเวลา</div>' +
+        '<div class="progress-track"><div id="timeLeftBar" class="progress-fill" style="width:' + Math.round(cd.frac*100) + '%"></div></div>' +
+      '</div>' + body +
+    '</div>';
+  }
+
+  var MONTH_LABELS_TH = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  var MONTH_LABELS_TH_FULL = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+  var SCHEDULE_KEY = 'qrShiftSchedule_v1';
+
+  function monthKeyOf(y, m){ return y + '-' + String(m+1).padStart(2,'0'); }
+  function daysInMonthFn(y, m){ return new Date(y, m+1, 0).getDate(); }
+  function persistSchedule(){
+    if (firebaseEnabled){ try { fbDB.collection('appdata').doc('schedule').set({ data: state.schedule }); } catch(e){} return; }
+    try { localStorage.setItem(SCHEDULE_KEY, JSON.stringify(state.schedule)); } catch(e){}
+  }
+
+  /* schedule only stores exceptions: a worker is assumed to be WORKING on
+     any day that isn't explicitly marked — so months with no schedule
+     entered at all behave exactly like before (everyone expected to attend).
+     Stored value is a leave-type string: 'weekly' | 'annual' | 'sick'. */
+  var LEAVE_LABELS = { weekly: 'หยุดประจำสัปดาห์', annual: 'ลาพักร้อน', sick: 'ลาป่วย', sudden: 'ลากะทันหัน' };
+
+  function isOff(name, y, m, day){
+    var mk = monthKeyOf(y, m);
+    var monthSched = state.schedule[mk];
+    if (!monthSched) return false;
+    var workerSched = monthSched[name];
+    if (!workerSched) return false;
+    return !!workerSched[day];
+  }
+  function leaveTypeFor(name, y, m, day){
+    var mk = monthKeyOf(y, m);
+    var monthSched = state.schedule[mk];
+    if (!monthSched) return null;
+    var workerSched = monthSched[name];
+    if (!workerSched) return null;
+    return workerSched[day] || null;
+  }
+  function setOff(name, y, m, day, type){
+    var mk = monthKeyOf(y, m);
+    if (!state.schedule[mk]) state.schedule[mk] = {};
+    if (!state.schedule[mk][name]) state.schedule[mk][name] = {};
+    if (type) state.schedule[mk][name][day] = type;
+    else delete state.schedule[mk][name][day];
+  }
+
+  function changeStackMonth(delta){
+    var m = state.stackMonth + delta, y = state.stackYear;
+    if (m < 0){ m = 11; y--; } else if (m > 11){ m = 0; y++; }
+    state.stackMonth = m; state.stackYear = y;
+    renderFull();
+  }
+
+  function quickAddLeave(){
+    var nameEl = document.getElementById('quickLeaveWorker');
+    var dateEl = document.getElementById('quickLeaveDate');
+    var typeEl = document.getElementById('quickLeaveType');
+    if (!nameEl || !dateEl || !typeEl || !dateEl.value) { alert('กรุณาเลือกวันที่'); return; }
+    var parts = dateEl.value.split('-');
+    var y = parseInt(parts[0],10), m = parseInt(parts[1],10)-1, d = parseInt(parts[2],10);
+    setOff(nameEl.value, y, m, d, typeEl.value);
+    persistSchedule();
+    state.verifyMonth = monthKeyOf(y, m);
+    renderFull();
+    alert('บันทึกวันลาให้ ' + nameEl.value + ' วันที่ ' + d + '/' + (m+1) + '/' + (y+543) + ' (' + (LEAVE_LABELS[typeEl.value]||typeEl.value) + ') เรียบร้อย');
+  }
+
+
+  /* ---------- Excel roster importer ----------
+     Confirmed by the user:
+     - N, N/F  = หยุดประจำสัปดาห์ (weekly scheduled rest day)
+     - AN      = ลาพักร้อน (annual leave)
+     - Z       = ลาป่วย (sick leave)
+     Every other shift code (STD, C, K, S, PS, PS/OT, CG, CG/OT, OR, L, LP, P,
+     T, H, HK, GK, KO, O, FI, STDG, ...) means the person IS working that day,
+     just at a different shift time — our app only needs work/off + leave
+     type, not the exact shift time. */
+  var CODE_TO_LEAVE_TYPE = { 'N': 'weekly', 'N/F': 'weekly', 'AN': 'annual', 'Z': 'sick' };
+  function normalizeName(s){ return String(s||'').replace(/\s+/g, ' ').trim(); }
+
+  function levenshtein(a, b){
+    var m = a.length, n = b.length;
+    var dp = [];
+    for (var i=0; i<=m; i++){ dp.push(new Array(n+1).fill(0)); dp[i][0] = i; }
+    for (var j=0; j<=n; j++) dp[0][j] = j;
+    for (var i=1; i<=m; i++){
+      for (var j=1; j<=n; j++){
+        dp[i][j] = a[i-1] === b[j-1] ? dp[i-1][j-1] : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
+      }
+    }
+    return dp[m][n];
+  }
+
+  /* Exact match first; if none, fall back to closest name by edit distance
+     (handles small typos/spelling differences between the roster file and
+     the app's worker list, e.g. "พรมศร" vs "พรมคร") — only accepts the fuzzy
+     match if it's close enough AND clearly the single best candidate. */
+  function findWorkerMatch(rawName){
+    var normName = normalizeName(rawName);
+    for (var wi=0; wi<state.workers.length; wi++){
+      if (normalizeName(state.workers[wi]) === normName) return { name: state.workers[wi], fuzzy: false };
+    }
+    var best = null, bestDist = Infinity, secondDist = Infinity;
+    state.workers.forEach(function(w){
+      var d = levenshtein(normName, normalizeName(w));
+      if (d < bestDist){ secondDist = bestDist; bestDist = d; best = w; }
+      else if (d < secondDist){ secondDist = d; }
+    });
+    var threshold = Math.max(2, Math.floor(normName.length * 0.2));
+    if (best && bestDist <= threshold && bestDist < secondDist){
+      return { name: best, fuzzy: true, distance: bestDist, from: normName };
+    }
+    return null;
+  }
+
+  function parseMonthYearFromFilename(filename){
+    var m = String(filename||'').match(/(\d{1,2})[_\-](\d{4})/);
+    if (!m) return null;
+    var month = parseInt(m[1], 10), year = parseInt(m[2], 10);
+    if (!(month >= 1 && month <= 12)) return null;
+    return { year: year, month: month-1 }; // filename year is already Gregorian (e.g. ตารางกะ_08_2026_WW1.xlsx)
+  }
+
+  function parseSheetSchedule(rows, report, targetMY){
+    if (!rows || !rows.length) return;
+
+    var headerRowIdx = -1, nameColIdx = -1;
+    for (var r=0; r<Math.min(rows.length, 6); r++){
+      var row = rows[r] || [];
+      for (var c=0; c<row.length; c++){
+        if (String(row[c]||'').trim() === 'รายชื่อ'){ headerRowIdx = r; nameColIdx = c; break; }
+      }
+      if (headerRowIdx !== -1) break;
+    }
+    if (headerRowIdx === -1){ report.skippedSheets++; return; }
+
+    var headerRow = rows[headerRowIdx] || [];
+    var dayStartCol = nameColIdx + 1;
+    var dayNumbers = [];
+    var c2 = dayStartCol;
+    while (c2 < headerRow.length){
+      var n = parseInt(String(headerRow[c2]||'').trim(), 10);
+      if (!(n >= 1 && n <= 31)) break;
+      dayNumbers.push(n);
+      c2++;
+    }
+    if (!dayNumbers.length){ report.skippedSheets++; return; }
+
+    var firstOneIdx = dayNumbers.indexOf(1);
+    if (firstOneIdx === -1) firstOneIdx = 0;
+
+    var dateForCol = [];
+    var seg = 'prev';
+    for (var i=0;i<dayNumbers.length;i++){
+      if (i === firstOneIdx) seg = 'target';
+      if (seg === 'target' && i > firstOneIdx && dayNumbers[i] < dayNumbers[i-1]) seg = 'next';
+      var y = targetMY.year, mo = targetMY.month;
+      if (seg === 'prev'){ mo -= 1; if (mo < 0){ mo = 11; y -= 1; } }
+      else if (seg === 'next'){ mo += 1; if (mo > 11){ mo = 0; y += 1; } }
+      dateForCol.push({ y: y, m: mo, d: dayNumbers[i] });
+    }
+
+    var stopped = false;
+    var currentPosition = '';
+    var reachedTarget = false;
+    for (var rr = headerRowIdx+1; rr < rows.length && !stopped; rr++){
+      var dataRow = rows[rr] || [];
+
+      var posCell = dataRow[0];
+      if (posCell !== undefined && posCell !== null && String(posCell).trim() !== '') currentPosition = String(posCell).trim();
+      if (!reachedTarget && currentPosition.toLowerCase().indexOf('supervisor') !== -1) reachedTarget = true;
+
+      var rawName = dataRow[nameColIdx];
+      if (rawName === undefined || rawName === null || String(rawName).trim() === '') continue;
+      if (String(rawName).indexOf('หมายเหตุ') !== -1){ stopped = true; break; }
+      if (!reachedTarget) continue; // skip rows above Supervisor (e.g. MANAG, ASTT.MANG)
+
+      var normName = normalizeName(rawName);
+      var match = findWorkerMatch(rawName);
+      if (!match){ report.unmatched[normName] = true; continue; }
+      var matched = match.name;
+      if (match.fuzzy) report.fuzzyMatches[normName] = matched;
+
+      report.matchedRows++;
+      for (var di=0; di<dayNumbers.length; di++){
+        var cell = dataRow[dayStartCol + di];
+        if (cell === undefined || cell === null) continue;
+        var code = String(cell).trim();
+        if (code === '') continue;
+        var dc = dateForCol[di];
+        if (dc.y !== targetMY.year || dc.m !== targetMY.month) continue; // trim overflow days from adjacent months
+        var leaveType = CODE_TO_LEAVE_TYPE[code.toUpperCase()] || null;
+        setOff(matched, dc.y, dc.m, dc.d, leaveType);
+        report.monthsTouched[monthKeyOf(dc.y, dc.m)] = true;
+      }
+    }
+  }
+
+  function findScheduleSheet(wb, targetMY){
+    var monthNum = targetMY.month + 1;
+    var candidates = [];
+    wb.SheetNames.forEach(function(name){
+      var m = String(name).trim().match(/^(\d{1,2})\.(\d{4})/);
+      if (m) candidates.push({ name: name, month: parseInt(m[1],10) });
+    });
+    var monthMatches = candidates.filter(function(c){ return c.month === monthNum; });
+    if (monthMatches.length){
+      var withAll = monthMatches.filter(function(c){ return c.name.indexOf('ALL') !== -1; });
+      var picked = withAll.length ? withAll[0] : monthMatches[0];
+      return { sheetName: picked.name };
+    }
+    return { sheetName: wb.SheetNames[0], noMatch: true };
+  }
+
+  function importScheduleWorkbook(wb, filename){
+    var report = { matchedRows: 0, unmatched: {}, fuzzyMatches: {}, monthsTouched: {}, skippedSheets: 0 };
+    var targetMY = parseMonthYearFromFilename(filename);
+    if (!targetMY){
+      alert('ไม่พบเดือน/ปีในชื่อไฟล์ กรุณาตั้งชื่อไฟล์ให้มีรูปแบบ ..._MM_YYYY... เช่น ตารางกะ_08_2026_WW1.xlsx');
+      return;
+    }
+    var sheetPick = findScheduleSheet(wb, targetMY);
+    var firstSheetName = sheetPick.sheetName;
+    var ws = wb.Sheets[firstSheetName];
+    var rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '' });
+    parseSheetSchedule(rows, report, targetMY);
+
+    persistSchedule();
+    renderFull();
+    var unmatchedNames = Object.keys(report.unmatched);
+    var fuzzyPairs = Object.keys(report.fuzzyMatches);
+    var months = Object.keys(report.monthsTouched);
+    if (months.length) state.verifyMonth = months[0];
+    var msg = 'นำเข้าตารางกะจากชีท "' + firstSheetName + '" สำเร็จ\nแถวพนักงานที่จับคู่ชื่อได้: ' + report.matchedRows + '\nเดือนที่ได้ข้อมูล: ' + (months.length ? months.join(', ') : '-');
+    if (sheetPick.noMatch) msg += '\n⚠ ไม่พบชีทที่ชื่อตรงกับเดือนในชื่อไฟล์เลย ใช้ชีทแรกแทน (ตรวจสอบให้ดีว่าถูกเดือนจริงหรือไม่)';
+    if (report.skippedSheets) msg += '\nไม่พบรูปแบบหัวตาราง (คอลัมน์ "รายชื่อ") ในชีทที่เลือก';
+    if (fuzzyPairs.length) msg += '\nจับคู่ชื่อแบบใกล้เคียง (สะกดไม่ตรงเป๊ะ) ' + fuzzyPairs.length + ' คน:\n' + fuzzyPairs.slice(0,15).map(function(k){ return '  "' + k + '" → "' + report.fuzzyMatches[k] + '"'; }).join('\n') + (fuzzyPairs.length>15?'\n  ...':'') + '\nกรุณาตรวจสอบว่าจับคู่ถูกคนหรือไม่ในตารางตรวจสอบด้านล่าง';
+    if (unmatchedNames.length) msg += '\nชื่อในไฟล์ที่ไม่พบในรายชื่อพนักงานของระบบ (' + unmatchedNames.length + '): ' + unmatchedNames.slice(0,15).join(', ') + (unmatchedNames.length>15?' ...':'');
+    alert(msg);
+  }
+
+  function handleScheduleFile(file){
+    var reader = new FileReader();
+    reader.onload = function(e){
+      try {
+        var wb = XLSX.read(e.target.result, { type: 'binary' });
+        importScheduleWorkbook(wb, file.name);
+      } catch(err){ alert('อ่านไฟล์ไม่สำเร็จ: ตรวจสอบว่าเป็นไฟล์ Excel/CSV ที่ถูกต้อง'); }
+    };
+    reader.readAsBinaryString(file);
+  }
+
+  /* Yearly report: monthly check-in totals + which workers are absent most often.
+     "Absent" is counted only against shift-meetings that actually happened
+     (at least one person checked in for that shift window) — a window with
+     zero check-ins usually means the line wasn't running / QR wasn't shown,
+     not that everyone skipped it. */
+  function buildYearlyReport(year){
+    var monthCounts = [0,0,0,0,0,0,0,0,0,0,0,0];
+    var windowAttendance = {}; // windowKey -> Set(names)
+    state.records.forEach(function(r){
+      var d = new Date(r.timestamp);
+      if (d.getFullYear() !== year) return;
+      monthCounts[d.getMonth()]++;
+      var k = windowKeyFor(r.shiftId, r.timestamp);
+      if (!windowAttendance[k]) windowAttendance[k] = new Set();
+      windowAttendance[k].add(r.name);
+    });
+    var windowKeys = Object.keys(windowAttendance);
+    var totalWindows = windowKeys.length;
+    var leaderboard = state.workers.map(function(w){
+      var expected = windowKeys.filter(function(k){
+        var ts = parseInt(k.split('_')[0], 10);
+        var d = new Date(ts);
+        return !isOff(w, d.getFullYear(), d.getMonth(), d.getDate());
+      });
+      var attended = expected.filter(function(k){ return windowAttendance[k].has(w); }).length;
+      var total = expected.length;
+      var missed = total - attended;
+      var rate = total === 0 ? 0 : Math.round(missed/total*100);
+      return { name: w, missed: missed, attended: attended, total: total, rate: rate };
+    }).filter(function(x){ return x.total > 0; }).sort(function(a,b){ return b.missed - a.missed || b.rate - a.rate; });
+    return { monthCounts: monthCounts, totalWindows: totalWindows, leaderboard: leaderboard };
+  }
+
+
+  function dailyStackHtml(y, m){
+    var dim = daysInMonthFn(y, m);
+    var cols = '90px ' + Array(dim).fill('1fr').join(' ');
+    var head = '<div class="verify-row verify-head-row" style="grid-template-columns:' + cols + '">' +
+      '<div class="verify-name-cell verify-head-label">พนักงาน</div>' +
+      Array.from({length:dim}, function(_,i){ return '<div class="verify-head">' + (i+1) + '</div>'; }).join('') +
+    '</div>';
+    var body = state.workers.map(function(w){
+      var cells = '';
+      for (var d=1; d<=dim; d++){
+        var c = countForDay(w, y, m, d);
+        var bg = c===0 ? 'var(--surface)' : (c===1 ? 'var(--accent-100)' : 'var(--good-100)');
+        var fg = c===0 ? 'var(--muted)' : (c===1 ? 'var(--accent-700)' : 'var(--good)');
+        cells += '<div class="verify-cell" style="background:' + bg + ';color:' + fg + ';display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700" title="' + escapeHtml(w) + ' วันที่ ' + d + ': เช็คชื่อ ' + c + ' ครั้ง">' + (c||'') + '</div>';
+      }
+      return '<div class="verify-row" style="grid-template-columns:' + cols + '"><div class="verify-name-cell">' + escapeHtml(w) + '</div>' + cells + '</div>';
+    }).join('');
+    return '<div class="verify-wrap">' + head + body + '</div>';
+  }
+
+  function recentRowsHtml(searchTerm){
+    var search = normalizeName(searchTerm||'');
+    var filtered = state.records.filter(function(r){ return !search || r.name.indexOf(search) !== -1; });
+    var recent = filtered.slice().sort(function(a,b){ return b.timestamp-a.timestamp; }).slice(0,30);
+    if (!recent.length){
+      return search
+        ? '<div class="muted small center pad">ไม่พบรายการของ "' + escapeHtml(search) + '"</div>'
+        : '<div class="card"><div class="card-title">ยังไม่มีการบันทึกการส่งกะ</div><div class="card-body">สแกน QR code จากหน้าจอแสดงเพื่อเริ่มบันทึกรายการแรก</div></div>';
+    }
+    return recent.map(function(r){
+      var status = statusFor(r);
+      var tagClass = status==='ตรงเวลา' ? 'tag-neutral' : 'tag-accent';
+      var picked = !!state.selectedRecordIds[r.id];
+      return '<div class="rowcard static" style="' + (picked?'border-color:var(--accent-700);background:var(--accent-100)':'') + '">' +
+        '<input type="checkbox" data-action="toggle-record" data-id="' + r.id + '" ' + (picked?'checked':'') + ' style="width:16px;height:16px;flex-shrink:0">' +
+        '<div class="avatar" style="background:' + colorFor(r.name) + '">' + escapeHtml(r.name.charAt(0)) + '</div>' +
+        '<div class="rowcard-info"><div class="rowcard-name">' + escapeHtml(r.name) + '</div>' +
+        '<div class="muted xsmall">' + formatDate(r.timestamp) + ' ' + formatTime(r.timestamp) + ' · ' + escapeHtml(r.shiftLabel) + '</div></div>' +
+        '<span class="tag ' + tagClass + '">' + status + '</span></div>';
+    }).join('');
+  }
+
+  function historyTabHtml(){
+    var records = state.records;
+    var now = state.now;
+    var todayStr = localDateStr(now);
+    var todayCount = records.filter(function(r){ return r.dateStr === todayStr; }).length;
+
+    var shift = getCurrentShift(new Date(now));
+    var currentWindowKey = windowKeyFor(shift.id, now);
+    var checkedNow = usedNamesForWindow(currentWindowKey).size;
+    var notYetCount = Math.max(0, state.workers.length - checkedNow);
+
+    var days = [];
+    for (var i=6;i>=0;i--) days.push(localDateStr(now - i*86400000));
+    var countsByDay = days.map(function(ds){ return records.filter(function(r){ return r.dateStr===ds; }).length; });
+    var maxCount = Math.max.apply(null, [1].concat(countsByDay));
+    var barsHtml = days.map(function(ds, idx){
+      var c = countsByDay[idx], pct = Math.round(c/maxCount*100);
+      var lbl = formatDate(new Date(ds).getTime());
+      return '<div class="bar-col" title="' + lbl + ': ' + c + ' คน">' +
+        '<div class="bar-count">' + c + '</div>' +
+        '<div class="bar-fill" style="height:' + pct + '%"></div>' +
+        '<div class="bar-label">' + lbl + '</div></div>';
+    }).join('');
+
+    var last7 = records.filter(function(r){ return days.indexOf(r.dateStr) !== -1; });
+    var onTimeN = last7.filter(function(r){ return statusFor(r)==='ตรงเวลา'; }).length;
+    var ontimeLabel = last7.length===0 ? '—' : Math.round(onTimeN/last7.length*100) + '%';
+
+    var yearNow = new Date(now).getFullYear();
+    var yr = buildYearlyReport(yearNow);
+    var maxMonth = Math.max.apply(null, [1].concat(yr.monthCounts));
+    var monthBarsHtml = yr.monthCounts.map(function(c, idx){
+      var pct = Math.round(c/maxMonth*100);
+      return '<div class="bar-col" title="' + MONTH_LABELS_TH[idx] + ' ' + (yearNow+543) + ': ' + c + ' ครั้ง">' +
+        '<div class="bar-count">' + c + '</div>' +
+        '<div class="bar-fill" style="height:' + pct + '%"></div>' +
+        '<div class="bar-label">' + MONTH_LABELS_TH[idx] + '</div></div>';
+    }).join('');
+
+    var leaderboardHtml;
+    if (yr.totalWindows === 0){
+      leaderboardHtml = '<div class="card"><div class="card-title">ยังไม่มีข้อมูลปีนี้</div><div class="card-body">ต้องมีการเช็คชื่ออย่างน้อย 1 ครั้งในรอบกะใดกะหนึ่งก่อน ระบบถึงจะเริ่มนับสถิติการขาดได้</div></div>';
+    } else {
+      var top = yr.leaderboard.slice(0, 8);
+      leaderboardHtml = '<div class="rowlist">' + top.map(function(x, i){
+        return '<div class="rowcard static">' +
+          '<div class="avatar" style="background:' + colorFor(x.name) + '">' + escapeHtml(x.name.charAt(0)) + '</div>' +
+          '<div class="rowcard-info"><div class="rowcard-name">' + (i+1) + '. ' + escapeHtml(x.name) + '</div>' +
+          '<div class="muted xsmall">มาแล้ว ' + x.attended + ' / ' + x.total + ' ครั้งที่มีการส่งกะ</div></div>' +
+          '<span class="tag tag-accent">ขาด ' + x.rate + '%</span></div>';
+      }).join('') + '</div>';
+    }
+
+    var rowsHtml = recentRowsHtml(state.historySearchName);
+    var selectedCount = Object.keys(state.selectedRecordIds).length;
+
+    return '<div class="panel">' +
+      '<div class="statgrid">' +
+        '<div class="card stat"><div class="stat-icon">' + ICON_CLOCK + '</div><div class="kicker">เข้ากะวันนี้</div><div class="stat-num">' + todayCount + '</div></div>' +
+        '<div class="card stat"><div class="stat-icon">' + ICON_CHECK2 + '</div><div class="kicker">ตรงเวลา (7 วัน)</div><div class="stat-num">' + ontimeLabel + '</div></div>' +
+        '<div class="card stat"><div class="stat-icon">' + ICON_WARN + '</div><div class="kicker">ยังไม่เข้าร่วม (กะนี้)</div><div class="stat-num accent">' + notYetCount + '</div></div>' +
+      '</div>' +
+      '<div><h4 style="margin-bottom:12px">จำนวนคนเข้ากะต่อวัน (7 วันล่าสุด)</h4><div class="barchart">' + barsHtml + '</div></div>' +
+      '<div><h4 style="margin-bottom:4px">แนวโน้มการเช็คชื่อรายวัน (ทุกคน) — ' + MONTH_LABELS_TH_FULL[state.stackMonth] + ' ' + (state.stackYear+543) + '</h4>' +
+        '<div class="muted xsmall" style="margin-bottom:8px">แต่ละเส้น = พนักงาน 1 คน · แตะชื่อในตำนานด้านล่างกราฟเพื่อซ่อน/แสดงเฉพาะคนที่สนใจ</div>' +
+        '<div style="height:280px;position:relative"><canvas id="trendChart"></canvas></div>' +
+      '</div>' +
+      '<div><div class="row-between" style="margin-bottom:4px">' +
+          '<button class="btn btn-ghost" data-action="stack-prev-month">‹</button>' +
+          '<h4 style="margin:0">จำนวนครั้งที่เช็คชื่อต่อวัน — ' + MONTH_LABELS_TH_FULL[state.stackMonth] + ' ' + (state.stackYear+543) + '</h4>' +
+          '<button class="btn btn-ghost" data-action="stack-next-month">›</button>' +
+        '</div>' +
+        '<div class="muted xsmall" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:8px">' +
+          '<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:var(--surface);border:1px solid var(--divider);display:inline-block"></span>0 = ไม่มา</span>' +
+          '<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:var(--accent-100);border:1px solid var(--divider);display:inline-block"></span>1 = มา 1 ครั้ง</span>' +
+          '<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:var(--good-100);border:1px solid var(--divider);display:inline-block"></span>2 = มา 2 ครั้ง (สูงสุด/วัน)</span>' +
+        '</div>' + dailyStackHtml(state.stackYear, state.stackMonth) +
+      '</div>' +
+      '<div><h4 style="margin-bottom:4px">ภาพรวมทั้งปี ' + (yearNow+543) + ' (แยกตามเดือน)</h4><div class="muted xsmall" style="margin-bottom:12px">จำนวนครั้งที่มีการเช็คชื่อทั้งหมดในแต่ละเดือน</div><div class="barchart">' + monthBarsHtml + '</div></div>' +
+      '<div><h4 style="margin-bottom:4px">พนักงานที่ขาดส่งกะบ่อยที่สุด (ปี ' + (yearNow+543) + ')</h4><div class="muted xsmall" style="margin-bottom:12px">นับเทียบกับกะที่มีการเช็คชื่อเกิดขึ้นจริง ' + yr.totalWindows + ' ครั้ง โดยไม่นับวันหยุดของแต่ละคน (ถ้าใส่ตารางกะไว้ในหน้ารายชื่อพนักงาน)</div>' + leaderboardHtml + '</div>' +
+      '<div><div class="row-between" style="margin-bottom:8px"><h4 style="margin:0">รายการล่าสุด</h4>' +
+        '<div class="row-center gap-2">' +
+          '<button class="btn btn-secondary" data-action="export-csv" ' + (records.length===0?'disabled':'') + '>Export CSV</button>' +
+          '<button class="btn btn-secondary" data-action="export-backup">สำรองข้อมูล (JSON)</button>' +
+        '</div></div>' +
+        '<input id="historySearchInput" class="input" placeholder="ค้นหาชื่อ..." value="' + escapeHtml(state.historySearchName||'') + '" style="margin-bottom:8px">' +
+      '<div class="rowlist" id="recentRowsContainer">' + rowsHtml + '</div></div>' +
+      '<div class="row-center gap-2" style="flex-wrap:wrap">' +
+        '<button class="btn btn-secondary" data-action="delete-selected-records" ' + (selectedCount===0?'disabled':'') + '>ลบที่เลือก (' + selectedCount + ')</button>' +
+        '<button class="btn btn-ghost accent-text" data-action="clear-history">ล้างประวัติทั้งหมด (สำหรับทดสอบ)</button>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function workerListHtml(search){
+    var filtered = state.workers.map(function(w,i){ return {w:w,i:i}; }).filter(function(o){ return !search || o.w.indexOf(search) !== -1; });
+    if (filtered.length===0) return '<div class="muted small center pad">ไม่พบรายชื่อที่ค้นหา</div>';
+    return filtered.map(function(o){
+      var w = o.w, i = o.i;
+      if (state.editingIndex === i){
+        return '<div class="rowcard">' +
+          '<div class="avatar" style="background:' + colorFor(w) + '">' + escapeHtml(w.charAt(0)) + '</div>' +
+          '<input id="edit-input-' + i + '" class="input" value="' + escapeHtml(w) + '" style="flex:1">' +
+          '<button class="btn btn-secondary" data-action="save-worker" data-idx="' + i + '">บันทึก</button>' +
+          '<button class="btn btn-ghost accent-text" data-action="delete-worker" data-idx="' + i + '">ลบ</button></div>';
+      }
+      return '<div class="rowcard">' +
+        '<div class="avatar" style="background:' + colorFor(w) + '">' + escapeHtml(w.charAt(0)) + '</div>' +
+        '<div class="rowcard-info" style="flex:1">' + escapeHtml(w) + '</div>' +
+        '<button class="btn btn-ghost" data-action="edit-worker" data-idx="' + i + '">แก้ไข</button>' +
+        '<button class="btn btn-ghost accent-text" data-action="delete-worker" data-idx="' + i + '">ลบ</button></div>';
+    }).join('');
+  }
+
+  function scheduleSummaryHtml(){
+    var keys = Object.keys(state.schedule).sort();
+    if (!keys.length) return '<div class="muted small">ยังไม่มีข้อมูลตารางกะ — อัปโหลดไฟล์ด้านบนเพื่อเริ่มต้น</div>';
+    return '<div class="rowlist">' + keys.map(function(mk){
+      var monthData = state.schedule[mk] || {};
+      var names = Object.keys(monthData);
+      var offCount = 0;
+      names.forEach(function(n){ offCount += Object.keys(monthData[n]||{}).length; });
+      var parts = mk.split('-');
+      var label = MONTH_LABELS_TH_FULL[parseInt(parts[1],10)-1] + ' ' + (parseInt(parts[0],10)+543);
+      return '<div class="rowcard static"><div class="rowcard-info"><div class="rowcard-name">' + label + '</div>' +
+        '<div class="muted xsmall">' + names.length + ' คนมีข้อมูล · รวม ' + offCount + ' วันหยุด/ลา</div></div></div>';
+    }).join('') + '</div>';
+  }
+
+  function monthLabelFor(mk){
+    var parts = mk.split('-');
+    return MONTH_LABELS_TH_FULL[parseInt(parts[1],10)-1] + ' ' + (parseInt(parts[0],10)+543);
+  }
+
+  function verifyTableHtml(monthKey){
+    if (!monthKey || !state.schedule[monthKey]) return '<div class="muted small" style="margin-top:8px">ยังไม่มีข้อมูลให้ตรวจสอบ — อัปโหลดไฟล์ก่อน</div>';
+    var monthData = state.schedule[monthKey];
+    var names = Object.keys(monthData);
+    if (!names.length) return '<div class="muted small" style="margin-top:8px">เดือนนี้ยังไม่มีข้อมูลรายคน</div>';
+    var parts = monthKey.split('-');
+    var y = parseInt(parts[0],10), m = parseInt(parts[1],10) - 1;
+    var dim = daysInMonthFn(y, m);
+    var cols = '78px ' + Array(dim).fill('1fr').join(' ');
+
+    var headCells = '';
+    for (var d=1; d<=dim; d++) headCells += '<div class="verify-head">' + d + '</div>';
+    var head = '<div class="verify-row verify-head-row" style="grid-template-columns:' + cols + '">' +
+      '<div class="verify-name-cell verify-head-label">พนักงาน</div>' + headCells + '</div>';
+
+    var body = names.map(function(name){
+      var days = monthData[name] || {};
+      var cells = '';
+      for (var d=1; d<=dim; d++){
+        var type = days[d] || null;
+        var label = type ? (LEAVE_LABELS[type] || type) : 'ทำงาน';
+        cells += '<div class="verify-cell ' + (type||'') + '" title="' + escapeHtml(name) + ' วันที่ ' + d + ': ' + label + '"></div>';
+      }
+      return '<div class="verify-row" style="grid-template-columns:' + cols + '"><div class="verify-name-cell">' + escapeHtml(name) + '</div>' + cells + '</div>';
+    }).join('');
+
+    return '<div class="verify-wrap">' + head + body + '</div>';
+  }
+
+
+  function masterTabHtml(){
+    var monthKeys = Object.keys(state.schedule).sort();
+    if (!state.verifyMonth && monthKeys.length) state.verifyMonth = monthKeys[monthKeys.length-1];
+    var selectorHtml = '';
+    if (monthKeys.length > 1){
+      selectorHtml = '<select id="verifyMonthSelect" class="input" style="width:auto">' + monthKeys.map(function(mk){
+        return '<option value="' + mk + '"' + (mk===state.verifyMonth?' selected':'') + '>' + monthLabelFor(mk) + '</option>';
+      }).join('') + '</select>';
+    } else if (monthKeys.length === 1){
+      selectorHtml = '<div class="muted small">' + monthLabelFor(monthKeys[0]) + '</div>';
+    }
+
+    return '<div class="panel narrow">' +
+      '<div class="card master-card">' +
+        '<div class="row-center gap-2">' + ICON_PEOPLE + '<div class="kicker">Master Data</div></div>' +
+        '<div class="card-title">รายชื่อพนักงาน (' + state.workers.length + ')</div>' +
+        '<hr class="hr">' +
+        '<div class="addrow"><input id="newWorkerInput" class="input" placeholder="ชื่อ-นามสกุล"><button class="btn btn-primary" data-action="add-worker">เพิ่ม</button></div>' +
+        '<input id="workerSearchInput" class="input" placeholder="ค้นหารายชื่อ..." value="' + escapeHtml(state.searchWorker||'') + '">' +
+        '<div id="workerListContainer" style="width:100%;display:flex;flex-direction:column;gap:6px">' + workerListHtml((state.searchWorker||'').trim()) + '</div>' +
+      '</div>' +
+      '<div class="card master-card">' +
+        '<div class="card-title">ตารางกะ (นำเข้าจากไฟล์)</div>' +
+        '<div class="muted xsmall">อัปโหลดไฟล์ตารางกะรายเดือน ระบบจะอ่านเดือน/ปีจากชื่อไฟล์และจับคู่ชื่อพนักงานให้อัตโนมัติ อัปโหลดไฟล์ใหม่ทุกครั้งที่มีตารางกะเดือนถัดไป</div>' +
+        '<div class="addrow" style="align-items:center">' +
+          '<button class="btn btn-primary" data-action="sched-upload-trigger">อัปโหลดไฟล์ตารางกะ (Excel/CSV)</button>' +
+          '<input id="schedFileInput" type="file" accept=".xlsx,.xls,.csv" style="display:none">' +
+        '</div>' +
+        '<hr class="hr">' +
+        '<div class="card-title" style="font-size:13px">เดือนที่มีข้อมูลแล้ว</div>' +
+        scheduleSummaryHtml() +
+      '</div>' +
+      '<div class="card master-card">' +
+        '<div class="card-title">เพิ่มการลากะทันหัน</div>' +
+        '<div class="muted xsmall">สำหรับคนที่ลาแบบไม่ได้แจ้งล่วงหน้า ไม่มีอยู่ในไฟล์ที่อัปโหลด — เพิ่มตรงนี้ได้เลย ไม่ต้องรออัปโหลดไฟล์ใหม่</div>' +
+        '<select id="quickLeaveWorker" class="input">' + state.workers.map(function(w){ return '<option value="' + escapeHtml(w) + '">' + escapeHtml(w) + '</option>'; }).join('') + '</select>' +
+        '<div class="addrow">' +
+          '<input id="quickLeaveDate" type="date" class="input" value="' + localDateStr(state.now) + '">' +
+          '<select id="quickLeaveType" class="input" style="flex:1">' +
+            '<option value="sudden">ลากะทันหัน</option>' +
+            '<option value="sick">ลาป่วย</option>' +
+            '<option value="annual">ลาพักร้อน</option>' +
+          '</select>' +
+        '</div>' +
+        '<button class="btn btn-primary btn-block" data-action="quick-add-leave">บันทึกวันลา</button>' +
+      '</div>' +
+      '<div class="card master-card">' +
+        '<div class="card-title">ตารางตรวจสอบ (เทียบกับไฟล์)</div>' +
+        '<div class="muted xsmall" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">' +
+          '<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:var(--surface);border:1px solid var(--divider);display:inline-block"></span>ทำงาน</span>' +
+          '<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:var(--accent-100);border:1px solid var(--divider);display:inline-block"></span>หยุดประจำสัปดาห์</span>' +
+          '<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:#dbe7f7;border:1px solid var(--divider);display:inline-block"></span>ลาพักร้อน</span>' +
+          '<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:#fbdada;border:1px solid var(--divider);display:inline-block"></span>ลาป่วย</span>' +
+          '<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:#e8dbf7;border:1px solid var(--divider);display:inline-block"></span>ลากะทันหัน</span>' +
+        '</div>' +
+        selectorHtml +
+        verifyTableHtml(state.verifyMonth) +
+      '</div>' +
+    '</div>';
+  }
+
+  function pinLabelFor(tab){
+    if (tab === 'history') return 'ประวัติ & กราฟ';
+    if (tab === 'master') return 'รายชื่อพนักงาน';
+    return 'หน้านี้';
+  }
+
+  function pinLockHtml(){
+    return '<div class="panel narrow">' +
+      '<div class="card elev-md pin-card">' +
+        '<div class="pin-icon">' + ICON_LOCK + '</div>' +
+        '<div style="text-align:center">' +
+          '<div class="card-title">ใส่รหัสผ่าน</div>' +
+          '<div class="muted small" style="margin-top:2px">เพื่อเข้าหน้า ' + escapeHtml(pinLabelFor(state.pendingTab)) + '</div>' +
+        '</div>' +
+        '<input id="pinInput" class="input pin-input ' + (state.pinError?'shake':'') + '" type="password" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="••••">' +
+        (state.pinError ? '<div class="pin-error">รหัสไม่ถูกต้อง ลองอีกครั้ง</div>' : '') +
+        '<button class="btn btn-primary btn-block" data-action="pin-submit">ยืนยัน</button>' +
+        '<button class="btn btn-ghost" data-action="pin-cancel">ยกเลิก</button>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function requestTab(tab){
+    if ((tab === 'history' || tab === 'master') && !state.unlockedAdmin){
+      state.pendingTab = tab; state.pinError = false; state.tab = 'pinlock'; renderFull();
+      setTimeout(function(){ var el = document.getElementById('pinInput'); if (el) el.focus(); }, 0);
+    } else {
+      setTab(tab);
+    }
+  }
+
+  function submitPin(){
+    var el = document.getElementById('pinInput'); if (!el) return;
+    if ((el.value || '') === ADMIN_PIN){
+      state.unlockedAdmin = true; state.pinError = false;
+      try { sessionStorage.setItem(PIN_SESSION_KEY, '1'); } catch(e){}
+      setTab(state.pendingTab || 'display');
+    } else {
+      state.pinError = true; renderFull();
+      setTimeout(function(){ var el2 = document.getElementById('pinInput'); if (el2){ el2.focus(); } }, 0);
+    }
+  }
+
+  function tabContentHtml(){
+    switch(state.tab){
+      case 'display': return displayTabHtml();
+      case 'checkin': return checkinTabHtml();
+      case 'history': return historyTabHtml();
+      case 'master': return masterTabHtml();
+      case 'pinlock': return pinLockHtml();
+      default: return '';
+    }
+  }
+
+  function renderFull(){
+    var app = document.getElementById('app');
+    app.innerHTML = topbarHtml() + '<main class="main">' + tabContentHtml() + '</main>' + bottomNavHtml();
+    if (state.tab === 'display') renderQR();
+    if (state.tab === 'history') renderTrendChart();
+  }
+
+  var trendChartInstance = null;
+  function renderTrendChart(){
+    var canvas = document.getElementById('trendChart');
+    if (!canvas || typeof Chart === 'undefined') return;
+    if (trendChartInstance){ trendChartInstance.destroy(); trendChartInstance = null; }
+    var y = state.stackYear, m = state.stackMonth;
+    var dim = daysInMonthFn(y, m);
+    var labels = Array.from({length:dim}, function(_,i){ return String(i+1); });
+    var datasets = state.workers.map(function(w){
+      var data = [];
+      for (var d=1; d<=dim; d++) data.push(countForDay(w, y, m, d));
+      var col = colorFor(w);
+      return { label: w, data: data, borderColor: col, backgroundColor: col, tension: 0.3, pointRadius: 2, borderWidth: 1.5, spanGaps: true };
+    });
+    try {
+      trendChartInstance = new Chart(canvas, {
+        type: 'line',
+        data: { labels: labels, datasets: datasets },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          interaction: { mode: 'nearest', intersect: false },
+          plugins: { legend: { position: 'bottom', labels: { boxWidth: 9, font: { size: 9 } } } },
+          scales: {
+            y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 10 } } },
+            x: { ticks: { font: { size: 9 } } }
+          }
+        }
+      });
+    } catch(e){}
+  }
+
+  function patchCountdown(){
+    var cd = computeCountdown();
+    var lbl = document.getElementById('countdownLabel'); if (lbl) lbl.textContent = cd.label;
+    var ring = document.getElementById('ringProgress'); if (ring) ring.setAttribute('stroke-dashoffset', cd.offset);
+    var bar = document.getElementById('timeLeftBar'); if (bar) bar.style.width = Math.round(cd.frac*100) + '%';
+    var qrbox = document.getElementById('qrbox'); if (qrbox) qrbox.classList.toggle('pulse', cd.urgent);
+  }
+  function patchClock(){
+    var el = document.getElementById('nowLabel'); if (el) el.textContent = fmtNow();
+    var shift = getCurrentShift(new Date(state.now));
+    var st = document.getElementById('shiftTag'); if (st) st.textContent = shift.label;
+  }
+
+  function tick(){
+    var wasExpired = state.expired;
+    var now = Date.now();
+    var totalMs = CONFIG.expiryMinutes*60000;
+    if (!state.expired && now - state.tokenCreatedAt >= totalMs) state.expired = true;
+    state.now = now;
+    if (state.expired !== wasExpired) renderFull();
+    else { patchCountdown(); patchClock(); }
+  }
+
+  /* ---------- event delegation ---------- */
+  function onClick(e){
+    var t = e.target.closest ? e.target.closest('[data-action]') : null;
+    if (!t) return;
+    var action = t.getAttribute('data-action');
+    switch(action){
+      case 'go-tab': requestTab(t.getAttribute('data-tab')); break;
+      case 'pin-submit': submitPin(); break;
+      case 'pin-cancel': state.pinError = false; setTab('display'); break;
+      case 'reset-qr': resetQR(); break;
+      case 'select-name': state.selectedName = t.getAttribute('data-name'); renderFull(); break;
+      case 'save-entry': saveEntry(); break;
+      case 'export-csv': exportCSV(); break;
+      case 'export-backup': exportBackupJSON(); break;
+      case 'clear-history': clearHistory(); break;
+      case 'toggle-record': toggleRecordSelect(t.getAttribute('data-id')); break;
+      case 'delete-selected-records': deleteSelectedRecords(); break;
+      case 'add-worker': addWorker(); break;
+      case 'edit-worker': startEdit(Number(t.getAttribute('data-idx'))); break;
+      case 'save-worker': saveEdit(Number(t.getAttribute('data-idx'))); break;
+      case 'delete-worker': deleteWorker(Number(t.getAttribute('data-idx'))); break;
+      case 'sched-upload-trigger': var fi = document.getElementById('schedFileInput'); if (fi) fi.click(); break;
+      case 'quick-add-leave': quickAddLeave(); break;
+      case 'stack-prev-month': changeStackMonth(-1); break;
+      case 'stack-next-month': changeStackMonth(1); break;
+    }
+  }
+  function onInput(e){
+    if (e.target && e.target.id === 'workerSearchInput'){
+      state.searchWorker = e.target.value;
+      var container = document.getElementById('workerListContainer');
+      if (container) container.innerHTML = workerListHtml(state.searchWorker.trim());
+    }
+    if (e.target && e.target.id === 'historySearchInput'){
+      state.historySearchName = e.target.value;
+      var rc = document.getElementById('recentRowsContainer');
+      if (rc) rc.innerHTML = recentRowsHtml(state.historySearchName);
+    }
+  }
+  function onKeypress(e){
+    if (e.key === 'Enter' && e.target && e.target.id === 'newWorkerInput') addWorker();
+    if (e.key === 'Enter' && e.target && e.target.id === 'pinInput') submitPin();
+  }
+
+  /* ---------- init ---------- */
+  function init(){
+    try {
+      var rawLock = localStorage.getItem(DEVICE_CHECKIN_KEY);
+      if (rawLock){
+        var lock = JSON.parse(rawLock);
+        if (lock && lock.date === localDateStr(Date.now())) state.deviceLock = lock;
+        else localStorage.removeItem(DEVICE_CHECKIN_KEY);
+      }
+    } catch(e){}
+    if (firebaseEnabled){
+      fbDB.collection('records').onSnapshot(function(snap){
+        state.records = snap.docs.map(function(d){
+          var data = d.data({ serverTimestamps: 'estimate' });
+          data.timestamp = fbToMillis(data.timestamp) || data.clientTimestamp || Date.now();
+          return data;
+        });
+        renderFull();
+      });
+      fbDB.collection('appdata').doc('workers').onSnapshot(function(doc){
+        var val = doc.exists ? doc.data().list : null;
+        if (val && val.length) state.workers = val;
+        else { state.workers = DEFAULT_WORKERS.slice(); fbDB.collection('appdata').doc('workers').set({ list: state.workers }); }
+        renderFull();
+      });
+      fbDB.collection('appdata').doc('schedule').onSnapshot(function(doc){
+        state.schedule = (doc.exists && doc.data().data) || {};
+        renderFull();
+      });
+    } else {
+      try { var raw = localStorage.getItem(HISTORY_KEY); state.records = raw ? JSON.parse(raw) : []; } catch(e){ state.records = []; }
+      try {
+        var rawW = localStorage.getItem(WORKERS_KEY);
+        if (rawW) state.workers = JSON.parse(rawW);
+        else { localStorage.setItem(WORKERS_KEY, JSON.stringify(DEFAULT_WORKERS)); state.workers = DEFAULT_WORKERS.slice(); }
+      } catch(e){ state.workers = DEFAULT_WORKERS.slice(); }
+      try { var rawS = localStorage.getItem(SCHEDULE_KEY); state.schedule = rawS ? JSON.parse(rawS) : {}; } catch(e){ state.schedule = {}; }
+    }
+    try { if (sessionStorage.getItem(PIN_SESSION_KEY) === '1') state.unlockedAdmin = true; } catch(e){}
+
+    var app = document.getElementById('app');
+    app.addEventListener('click', onClick);
+    app.addEventListener('input', onInput);
+    app.addEventListener('keypress', onKeypress);
+    app.addEventListener('change', function(e){
+      if (e.target && e.target.id === 'schedFileInput' && e.target.files && e.target.files[0]){
+        handleScheduleFile(e.target.files[0]);
+        e.target.value = '';
+      }
+      if (e.target && e.target.id === 'verifyMonthSelect'){
+        state.verifyMonth = e.target.value;
+        renderFull();
+      }
+    });
+
+    /* real scan deep-link: QR encodes this page's URL with token/created params, shared by everyone */
+    var params = new URLSearchParams(window.location.search);
+    if (params.has('token')){
+      var created = Number(params.get('created')) || Date.now();
+      state.tab = 'checkin'; state.token = params.get('token'); state.tokenCreatedAt = created; state.now = Date.now(); state.deepLinkMode = true;
+      renderFull();
+    } else {
+      genToken();
+    }
+    setInterval(tick, 1000);
+  }
+
+  document.addEventListener('DOMContentLoaded', init);
+  window.addEventListener('pageshow', function(e){
+    if (e.persisted) location.reload();
+  });
+})();
+</script>
+</body>
+</html>
